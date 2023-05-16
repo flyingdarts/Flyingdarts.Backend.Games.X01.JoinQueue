@@ -11,6 +11,7 @@ using Flyingdarts.Lambdas.Shared;
 using Flyingdarts.Shared;
 using Microsoft.Extensions.Options;
 using RandomGen;
+using System.Text.Json;
 
 public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, APIGatewayProxyResponse>
 {
@@ -25,6 +26,7 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
     {
         var socketMessage = new SocketMessage<JoinX01QueueCommand>();
         socketMessage.Message = request;
+        socketMessage.Action = "v2/games/x01/joinqueue";
 
         var games = await _dbContext.FromQueryAsync<Game>(X01GamesQueryConfig(), _applicationOptions.ToOperationConfig())
             .GetRemainingAsync(cancellationToken);
@@ -38,7 +40,11 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
             await CreateGame(request.GamePlayerId, roomId, cancellationToken);
         }
 
-        return new APIGatewayProxyResponse { StatusCode = 200 };
+        return new APIGatewayProxyResponse
+        {
+            StatusCode = 200,
+            Body = JsonSerializer.Serialize(socketMessage)
+        };
     }
 
     private async Task JoinGame(Game game, Guid playerId, CancellationToken cancellationToken)
