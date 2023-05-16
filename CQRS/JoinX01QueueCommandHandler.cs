@@ -32,12 +32,16 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
             .GetRemainingAsync(cancellationToken);
 
         if (games.Any() && games.Any(x => x.Status == GameStatus.Qualifying))
-            await JoinGame(games.First(x=> x.Status == GameStatus.Qualifying), request.GamePlayerId, cancellationToken);
+        {
+            var game = games.First(x => x.Status == GameStatus.Qualifying);
+            await JoinGame(game, request.GamePlayerId, cancellationToken);
+            socketMessage.Message!.RoomId = game.RoomId;
+        }
         else
         {
-            var roomId = Gen.Random.Text.Length(7).Invoke();
-            socketMessage.Message!.RoomId = roomId;
-            await CreateGame(request.GamePlayerId, roomId, cancellationToken);
+            var roomId = Gen.Random.Text.Length(7);
+            socketMessage.Message!.RoomId = roomId();
+            await CreateGame(request.GamePlayerId, socketMessage.Message!.RoomId, cancellationToken);
         }
 
         return new APIGatewayProxyResponse
