@@ -33,3 +33,17 @@ jobs:
           REPO_NAME_WITH_DASHES=$(echo $REPO_NAME | sed 's/\./\-/g')
           REPO_NAME_WITH_DASHES=$(echo $REPO_NAME_WITH_DASHES | sed 's/flyingdarts\///')
           dotnet lambda deploy-function --function-name $REPO_NAME_WITH_DASHES -frun dotnet6 -f net6.0 --region ${{ secrets.AWS_REGION }}
+
+      - name: Get repo name
+        run: |
+          REPO_NAME=$GITHUB_REPOSITORY
+          echo "REPO_NAME_WITHOUT_DASHES=$(echo $REPO_NAME | sed 's/flyingdarts\///')" >> $GITHUB_ENV  
+      - name: Discord Webhook Action
+        uses: tsickert/discord-webhook@v5.3.0
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEVELOPMENT_ENDPOINTS_CHANNEL_WEBHOOK }}
+          content: Job completed
+          embed-title: ${{ github.ref_name }}
+          embed-description: ${{ github.owner }} ${{ env.REPO_NAME_WITHOUT_DASHES }}
+          embed-footer-text: ${{ github.repository_owner }}
+          embed-timestamp: ${{ github.event.head_commit.timestamp }}   
