@@ -7,6 +7,7 @@ using Flyingdarts.Persistence;
 using MediatR;
 using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.DataModel;
+using Flyingdarts.Lambdas.Shared;
 using Flyingdarts.Shared;
 using Microsoft.Extensions.Options;
 using RandomGen;
@@ -22,13 +23,20 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
     }
     public async Task<APIGatewayProxyResponse> Handle(JoinX01QueueCommand request, CancellationToken cancellationToken)
     {
+        var socketMessage = new SocketMessage<JoinX01QueueCommand>();
+        socketMessage.Message = request;
+
         var games = await _dbContext.FromQueryAsync<Game>(X01GamesQueryConfig(), _applicationOptions.ToOperationConfig())
             .GetRemainingAsync(cancellationToken);
 
         if (games.Any() && games.Any(x => x.Status == GameStatus.Qualifying))
             await JoinGame(games.First(x=> x.Status == GameStatus.Qualifying), request.GamePlayerId, cancellationToken);
         else
-            await CreateGame(request.GamePlayerId, cancellationToken);
+        {
+            var roomId = Gen.Random.Text.Length(7).Invoke();
+            socketMessage.Message!.RoomId = roomId;
+            await CreateGame(request.GamePlayerId, roomId, cancellationToken);
+        }
 
         return new APIGatewayProxyResponse { StatusCode = 200 };
     }
@@ -41,9 +49,9 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
         await gamePlayerWrite.ExecuteAsync(cancellationToken);
     }
 
-    private async Task CreateGame(Guid playerId, CancellationToken cancellationToken)
+    private async Task CreateGame(Guid playerId, string roomId, CancellationToken cancellationToken)
     {
-        var game = Game.Create(2, X01GameSettings.Create(1, 3), Gen.Random.Text.Length(7).Invoke());
+        var game = Game.Create(2, X01GameSettings.Create(1, 3), roomId);
         var gamePlayer = GamePlayer.Create(game.GameId, playerId);
 
         var gameWrite = _dbContext.CreateBatchWrite<Game>(_applicationOptions.ToOperationConfig()); gameWrite.AddPutItem(game);
