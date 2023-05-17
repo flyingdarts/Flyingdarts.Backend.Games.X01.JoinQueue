@@ -11,6 +11,7 @@ using Flyingdarts.Lambdas.Shared;
 using Flyingdarts.Shared;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, APIGatewayProxyResponse>
 {
@@ -78,6 +79,23 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
     {
         long ticks = DateTime.UtcNow.Ticks;
         byte[] tickBytes = BitConverter.GetBytes(ticks);
-        return Convert.ToBase64String(tickBytes);
+        string base64String = Convert.ToBase64String(tickBytes);
+
+        // Remove leading slashes if any
+        while (base64String.StartsWith("/"))
+        {
+            base64String = base64String.Substring(1);
+        }
+
+        // Replace any special characters
+        base64String = Regex.Replace(base64String, @"[^A-Za-z0-9]", "");
+
+        // Add trailing '=' character if needed
+        if (base64String.Length == 0 || base64String[base64String.Length - 1] != '=')
+        {
+            base64String += "=";
+        }
+
+        return base64String;
     }
 }
