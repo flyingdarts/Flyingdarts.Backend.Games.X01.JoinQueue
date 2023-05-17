@@ -20,7 +20,6 @@
 	  <PackageReference Include="Flyingdarts.Shared" Version="1.0.2.3" />
 	  <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0-preview.4.23259.5" />
 	  <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0-preview.4.23259.5" />
-	  <PackageReference Include="RandomGen" Version="1.1.6" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".github\workflows\build-and-publish-lambda.yml" />

@@ -10,7 +10,6 @@ using Amazon.DynamoDBv2.DataModel;
 using Flyingdarts.Lambdas.Shared;
 using Flyingdarts.Shared;
 using Microsoft.Extensions.Options;
-using RandomGen;
 using System.Text.Json;
 
 public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, APIGatewayProxyResponse>
@@ -39,8 +38,7 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
         }
         else
         {
-            var roomId = Gen.Random.Text.Length(7);
-            socketMessage.Message!.RoomId = roomId();
+            socketMessage.Message!.RoomId = ConvertTicksToBase64();
             await CreateGame(request.GamePlayerId, socketMessage.Message!.RoomId, cancellationToken);
         }
 
@@ -74,5 +72,12 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
     {
         var queryFilter = new QueryFilter("PK", QueryOperator.Equal, Constants.Game);
         return new QueryOperationConfig { Filter = queryFilter };
+    }
+
+    private static string ConvertTicksToBase64()
+    {
+        long ticks = DateTime.UtcNow.Ticks;
+        byte[] tickBytes = BitConverter.GetBytes(ticks);
+        return Convert.ToBase64String(tickBytes);
     }
 }
