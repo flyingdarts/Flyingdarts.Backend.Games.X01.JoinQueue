@@ -12,6 +12,7 @@ using Flyingdarts.Shared;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
 
 public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, APIGatewayProxyResponse>
 {
@@ -28,20 +29,13 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
         socketMessage.Message = request;
         socketMessage.Action = "v2/games/x01/joinqueue";
 
-        var games = await _dbContext.FromQueryAsync<Game>(X01GamesQueryConfig(), _applicationOptions.ToOperationConfig())
-            .GetRemainingAsync(cancellationToken);
+        var qualifyingGames = await GetQualifyingGamesAsync(cancellationToken);
 
-        if (games.Any() && games.Any(x => x.Status == GameStatus.Qualifying))
-        {
-            var game = games.First(x => x.Status == GameStatus.Qualifying);
-            await JoinGame(game, request.GamePlayerId, cancellationToken);
-            socketMessage.Message!.RoomId = game.RoomId;
-        }
-        else
-        {
-            socketMessage.Message!.RoomId = ConvertTicksToBase64();
-            await CreateGame(request.GamePlayerId, socketMessage.Message!.RoomId, cancellationToken);
-        }
+        var game = qualifyingGames.Any() 
+            ? qualifyingGames.First() 
+            : await CreateGame(cancellationToken);
+
+        socketMessage.Message!.GameId = game.GameId.ToString();
 
         return new APIGatewayProxyResponse
         {
@@ -49,7 +43,13 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
             Body = JsonSerializer.Serialize(socketMessage)
         };
     }
+    private async Task<List<Game>> GetQualifyingGamesAsync(CancellationToken cancellationToken)
+    {
+        var games = await _dbContext.FromQueryAsync<Game>(X01GamesQueryConfig(), _applicationOptions.ToOperationConfig())
+            .GetRemainingAsync(cancellationToken);
 
+        return games.Where(x => x.Status == GameStatus.Qualifying).ToList();
+    }
     private async Task JoinGame(Game game, Guid playerId, CancellationToken cancellationToken)
     {
         var gamePlayer = GamePlayer.Create(game.GameId, playerId);
@@ -58,15 +58,14 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
         await gamePlayerWrite.ExecuteAsync(cancellationToken);
     }
 
-    private async Task CreateGame(Guid playerId, string roomId, CancellationToken cancellationToken)
+    private async Task<Game> CreateGame(CancellationToken cancellationToken)
     {
-        var game = Game.Create(2, X01GameSettings.Create(1, 3), roomId);
-        var gamePlayer = GamePlayer.Create(game.GameId, playerId);
+        var game = Game.Create(2, X01GameSettings.Create(1, 3));
+        var gameWrite = _dbContext.CreateBatchWrite<Game>(_applicationOptions.ToOperationConfig()); 
+        gameWrite.AddPutItem(game);
 
-        var gameWrite = _dbContext.CreateBatchWrite<Game>(_applicationOptions.ToOperationConfig()); gameWrite.AddPutItem(game);
-        var gamePlayerWrite = _dbContext.CreateBatchWrite<GamePlayer>(_applicationOptions.ToOperationConfig()); gamePlayerWrite.AddPutItem(gamePlayer);
-
-        await gameWrite.Combine(gamePlayerWrite).ExecuteAsync(cancellationToken);
+        await gameWrite.ExecuteAsync(cancellationToken);
+        return game;
     }
 
     private static QueryOperationConfig X01GamesQueryConfig()
