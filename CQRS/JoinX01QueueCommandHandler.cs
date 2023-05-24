@@ -50,13 +50,6 @@ public class JoinX01QueueCommandHandler : IRequestHandler<JoinX01QueueCommand, A
 
         return games.Where(x => x.Status == GameStatus.Qualifying).ToList();
     }
-    private async Task JoinGame(Game game, Guid playerId, CancellationToken cancellationToken)
-    {
-        var gamePlayer = GamePlayer.Create(game.GameId, playerId);
-        var gamePlayerWrite = _dbContext.CreateBatchWrite<GamePlayer>(_applicationOptions.ToOperationConfig()); gamePlayerWrite.AddPutItem(gamePlayer);
-
-        await gamePlayerWrite.ExecuteAsync(cancellationToken);
-    }
 
     private async Task<Game> CreateGame(CancellationToken cancellationToken)
     {
